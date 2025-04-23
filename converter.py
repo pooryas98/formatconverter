@@ -1,17 +1,23 @@
 import os
 from bs4 import BeautifulSoup
 
-def convert_html_to_txt(html_filepath, txt_filepath):
+def convert_html_to_txt(html_filepath, txt_filepath=None, return_content=False):
     """
-    Reads an HTML file, extracts the text content, and saves it to a TXT file.
+    Reads an HTML file, extracts the text content.
+    Optionally saves it to a TXT file or returns the content.
 
     Args:
         html_filepath (str): The path to the input HTML file.
-        txt_filepath (str): The path where the output TXT file will be saved.
+        txt_filepath (str, optional): The path where the output TXT file will be saved.
+                                     Required if return_content is False. Defaults to None.
+        return_content (bool, optional): If True, returns the extracted text content
+                                         instead of writing to a file. Defaults to False.
 
     Returns:
-        tuple: (bool, str) where bool is True if successful, False otherwise,
-               and str is a status message.
+        tuple: If return_content is False: (bool, str) where bool is True if successful,
+               False otherwise, and str is a status message.
+        tuple: If return_content is True: (bool, str|None) where bool is True if successful,
+               False otherwise, and str is the extracted text content or None on failure.
     """
     try:
         # --- 1. Read the HTML file ---
@@ -34,22 +40,30 @@ def convert_html_to_txt(html_filepath, txt_filepath):
         # 'strip=True' removes leading/trailing whitespace from each text block.
         text_content = soup.get_text(separator='\n', strip=True)
 
-        # --- 5. Write the text to the TXT file ---
-        # Ensure the output directory exists
-        output_dir = os.path.dirname(txt_filepath)
-        if output_dir and not os.path.exists(output_dir):
-            try:
-                os.makedirs(output_dir)
-            except OSError as e:
-                 return False, f"Error creating output directory '{output_dir}': {e}"
+        if return_content:
+            # --- 5a. Return the content ---
+            return True, text_content
+        else:
+            # --- 5b. Write the text to the TXT file ---
+            if not txt_filepath:
+                return False, "Error: txt_filepath is required when return_content is False."
 
-        # Write the extracted text using 'utf-8' encoding.
-        with open(txt_filepath, 'w', encoding='utf-8') as f_txt:
-            f_txt.write(text_content)
+            # Ensure the output directory exists
+            output_dir = os.path.dirname(txt_filepath)
+            if output_dir and not os.path.exists(output_dir):
+                try:
+                    os.makedirs(output_dir)
+                except OSError as e:
+                     return False, f"Error creating output directory '{output_dir}': {e}"
 
-        return True, f"Successfully converted '{os.path.basename(html_filepath)}'. Output saved to: '{txt_filepath}'"
+            # Write the extracted text using 'utf-8' encoding.
+            with open(txt_filepath, 'w', encoding='utf-8') as f_txt:
+                f_txt.write(text_content)
+
+            return True, f"Successfully converted '{os.path.basename(html_filepath)}'. Output saved to: '{txt_filepath}'"
 
     except FileNotFoundError:
-        return False, f"Error: Input HTML file not found at '{html_filepath}'"
+        return False, f"Error: Input HTML file not found at '{html_filepath}'" if not return_content else (False, None)
     except Exception as e:
-        return False, f"An error occurred during conversion of '{os.path.basename(html_filepath)}': {e}"
+        error_msg = f"An error occurred during conversion of '{os.path.basename(html_filepath)}': {e}"
+        return False, error_msg if not return_content else (False, None)
