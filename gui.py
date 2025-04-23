@@ -47,6 +47,29 @@ class HtmlToTxtConverterApp:
         self.move_down_button = ttk.Button(self.reorder_frame, text="↓", command=self.move_file_down, width=2)
         self.move_down_button.pack(pady=2)
 
+        # --- Sorting Options ---
+        self.sort_frame = ttk.Frame(self.input_frame)
+        self.sort_frame.pack(side=tk.LEFT, padx=(5, 5), fill="y", anchor='n') # Anchor north
+
+        ttk.Label(self.sort_frame, text="Sort by:").pack(pady=(5,2))
+
+        self.sort_criteria_var = tk.StringVar()
+        self.sort_combobox = ttk.Combobox(
+            self.sort_frame,
+            textvariable=self.sort_criteria_var,
+            values=["Name", "Size", "Date Modified"],
+            state="readonly",
+            width=12 # Adjust width as needed
+        )
+        self.sort_combobox.pack(pady=2)
+        self.sort_combobox.set("Name") # Default sort criteria
+
+        self.sort_button = ttk.Button(self.sort_frame, text="Sort", command=self.sort_files)
+        self.sort_button.pack(pady=2)
+
+        self.reverse_button = ttk.Button(self.sort_frame, text="Reverse", command=self.reverse_files)
+        self.reverse_button.pack(pady=2)
+
 
         # --- Output Options ---
         self.output_frame = ttk.LabelFrame(master, text="Output Options")
@@ -106,10 +129,29 @@ class HtmlToTxtConverterApp:
         )
         if files:
             self.input_files = list(files)
-            self.file_listbox.delete(0, tk.END) # Clear previous list
-            for f in self.input_files:
-                self.file_listbox.insert(tk.END, os.path.basename(f))
+            self.update_file_listbox() # Use a helper function to update listbox
             self.update_status(f"{len(self.input_files)} file(s) selected.")
+            # Enable sort/reverse buttons if files are selected
+            self.toggle_sort_buttons_state()
+
+    def update_file_listbox(self):
+        """Clears and repopulates the file listbox from self.input_files."""
+        self.file_listbox.delete(0, tk.END)
+        for f in self.input_files:
+            self.file_listbox.insert(tk.END, os.path.basename(f))
+        # Ensure the listbox selection is cleared after update if needed
+        self.file_listbox.selection_clear(0, tk.END)
+
+    def toggle_sort_buttons_state(self):
+        """Enables or disables sort/reverse buttons based on file selection."""
+        state = tk.NORMAL if self.input_files else tk.DISABLED
+        self.sort_button.config(state=state)
+        self.reverse_button.config(state=state)
+        self.move_up_button.config(state=state)
+        self.move_down_button.config(state=state)
+        # Keep combobox always enabled or disable it too? Let's keep it enabled.
+        # self.sort_combobox.config(state=state)
+
 
     def move_file_up(self):
         selected_indices = self.file_listbox.curselection()
@@ -138,6 +180,42 @@ class HtmlToTxtConverterApp:
             self.file_listbox.selection_set(index + 1)
             # Move item in the underlying data list (self.input_files)
             self.input_files.insert(index + 1, self.input_files.pop(index))
+
+    def sort_files(self):
+        """Sorts the input_files list based on the selected criteria."""
+        if not self.input_files:
+            return
+
+        criteria = self.sort_criteria_var.get()
+        try:
+            if criteria == "Name":
+                # Sort by basename
+                self.input_files.sort(key=os.path.basename)
+            elif criteria == "Size":
+                # Sort by file size (ascending)
+                self.input_files.sort(key=lambda f: os.path.getsize(f))
+            elif criteria == "Date Modified":
+                # Sort by modification time (oldest first)
+                self.input_files.sort(key=lambda f: os.path.getmtime(f))
+            else:
+                self.update_status("Error: Unknown sort criteria selected.")
+                return
+
+            self.update_file_listbox() # Update the listbox display
+            self.update_status(f"Files sorted by {criteria}.")
+        except Exception as e:
+            messagebox.showerror("Sort Error", f"An error occurred during sorting:\n{e}")
+            self.update_status(f"Error sorting files: {e}")
+
+
+    def reverse_files(self):
+        """Reverses the order of the input_files list."""
+        if not self.input_files:
+            return
+        self.input_files.reverse()
+        self.update_file_listbox()
+        self.update_status("File order reversed.")
+
 
     def toggle_output_options(self):
         # Handles enabling/disabling based on BOTH checkboxes
@@ -173,6 +251,8 @@ class HtmlToTxtConverterApp:
         self.status_text.see(tk.END) # Scroll to the bottom
         self.status_text.config(state="disabled")
         self.master.update_idletasks() # Ensure UI updates
+        # Initial state for sort buttons
+        self.toggle_sort_buttons_state()
 
     def start_conversion(self):
         if not self.input_files:
